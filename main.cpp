@@ -1,6 +1,7 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
+#include "tgaimage.h"
 
 struct Point {
     // dans [-1, 1]
@@ -19,6 +20,7 @@ int main(int argc, char **argv) {
         return 1;
     }
 
+    // Read vertices
     std::vector<Point> points;
     std::string line;
     while (getline(file, line)) {
@@ -32,4 +34,13 @@ int main(int argc, char **argv) {
         }
     }
     std::cout << "Read " << points.size() << " points" << std::endl;
+
+    // Draw image
+    TGAImage image(800, 800, TGAImage::Format::RGB);
+    for (Point &p : points) {
+        int x = (p.x + 1) * 400;
+        int y = (p.y + 1) * 400;
+        image.set(x, y, TGAColor{255, 255, 255, 255});
+    }
+    image.write_tga_file("output.tga");
 }
