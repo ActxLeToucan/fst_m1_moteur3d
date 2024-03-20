@@ -3,8 +3,6 @@
 #include <vector>
 #include "tgaimage.h"
 #include "Object.h"
-#include "glm/common.hpp"
-#include "glm/vec2.hpp"
 #include "glm/mat3x3.hpp"
 
 void drawLine(int x0, int y0, int x1, int y1, TGAImage &image, TGAColor color) {
@@ -37,7 +35,7 @@ void drawLine(int x0, int y0, int x1, int y1, TGAImage &image, TGAColor color) {
     }
 }
 
-void drawTriangle(Triangle &triangle, std::vector<glm::vec3> &points, TGAImage &image, TGAColor color) {
+void drawTriangle(Triangle &triangle, std::vector<glm::vec3> &points, TGAImage &image) {
     glm::ivec3 p1 = points[triangle.v1-1] * 400.f + 400.f;
     glm::ivec3 p2 = points[triangle.v2-1] * 400.f + 400.f;
     glm::ivec3 p3 = points[triangle.v3-1] * 400.f + 400.f;
@@ -49,12 +47,6 @@ void drawTriangle(Triangle &triangle, std::vector<glm::vec3> &points, TGAImage &
                                     p2.x, p2.y, 1,
                                     p3.x, p3.y, 1));
 
-    //draw bounding box
-//    drawLine(boundingBoxMin.x, boundingBoxMin.y, boundingBoxMax.x, boundingBoxMin.y, image, color);
-//    drawLine(boundingBoxMax.x, boundingBoxMin.y, boundingBoxMax.x, boundingBoxMax.y, image, color);
-//    drawLine(boundingBoxMax.x, boundingBoxMax.y, boundingBoxMin.x, boundingBoxMax.y, image, color);
-//    drawLine(boundingBoxMin.x, boundingBoxMax.y, boundingBoxMin.x, boundingBoxMin.y, image, color);
-
     // fill triangle
     for (int x = boundingBoxMin.x; x <= boundingBoxMax.x; x++) {
         for (int y = boundingBoxMin.y; y <= boundingBoxMax.y; y++) {
@@ -62,7 +54,7 @@ void drawTriangle(Triangle &triangle, std::vector<glm::vec3> &points, TGAImage &
             glm::vec3 barycentric = matInv * p;
 
             if (glm::all(glm::greaterThanEqual(barycentric, glm::vec3(0)))) {
-                image.set(x, y, color);
+                image.set(x, y, TGAColor({ static_cast<uint8_t>(barycentric.x * 255), static_cast<uint8_t>(barycentric.y * 255), static_cast<uint8_t>(barycentric.z * 255) }));
             }
         }
     }
@@ -86,8 +78,7 @@ int main(int argc, char **argv) {
     // Draw image
     TGAImage image(800, 800, TGAImage::Format::RGB);
     for (Triangle &triangle : object.triangles) {
-        TGAColor randomColor = TGAColor({static_cast<uint8_t>(std::rand() % 255), static_cast<uint8_t>(std::rand() % 255), static_cast<uint8_t>(std::rand() % 255)});
-        drawTriangle(triangle, object.points, image, randomColor);
+        drawTriangle(triangle, object.points, image);
     }
     image.write_tga_file("output.tga");
 }
