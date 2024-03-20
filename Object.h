@@ -2,15 +2,15 @@
 
 #include <vector>
 #include <string>
-#include "Point.h"
 #include "Triangle.h"
+#include "glm/vec3.hpp"
 
 class Object {
 public:
     /**
      * @brief The points of the object
      */
-    std::vector<Point> points;
+    std::vector<glm::vec3> points;
     /**
      * @brief The triangles of the object
      */

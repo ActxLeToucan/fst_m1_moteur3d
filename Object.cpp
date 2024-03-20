@@ -9,7 +9,7 @@ Object::Object(std::ifstream &file) {
         lineNum++;
         if (line[0] == 'v' && line[1] == ' ') {
             // Read vertices
-            Point p;
+            glm::vec3 p;
             if (sscanf(line.c_str(), "v %f %f %f", &p.x, &p.y, &p.z) != 3) {
                 throw std::runtime_error("Error reading file at line " + std::to_string(lineNum));
             }
