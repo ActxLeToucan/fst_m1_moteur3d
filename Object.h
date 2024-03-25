@@ -1,7 +1,6 @@
 #pragma once
 
 #include <vector>
-#include <string>
 #include "Triangle.h"
 #include "glm/vec3.hpp"
 
@@ -19,7 +18,7 @@ public:
     /**
      * @brief Construct a new Object with no points or triangles
      */
-    Object() : points(), triangles() {}
+    Object() = default;
 
     /**
      * @brief Construct a new Object from a file

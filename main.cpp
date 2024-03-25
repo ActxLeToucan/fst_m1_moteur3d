@@ -1,9 +1,13 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
+
 #include "tgaimage.h"
 #include "Object.h"
 #include "glm/mat3x3.hpp"
+
+#define HEIGHT 800
+#define WIDTH 800
 
 void drawLine(int x0, int y0, int x1, int y1, TGAImage &image, TGAColor color) {
     bool steep = false;
@@ -35,13 +39,25 @@ void drawLine(int x0, int y0, int x1, int y1, TGAImage &image, TGAColor color) {
     }
 }
 
-void drawTriangle(Triangle &triangle, std::vector<glm::vec3> &points, TGAImage &image) {
-    glm::ivec3 p1 = points[triangle.v1-1] * 400.f + 400.f;
-    glm::ivec3 p2 = points[triangle.v2-1] * 400.f + 400.f;
-    glm::ivec3 p3 = points[triangle.v3-1] * 400.f + 400.f;
+void drawTriangle(Triangle &triangle, std::vector<glm::vec3> &points, TGAImage &image, glm::vec3 &light) {
+    glm::vec3 p1_monde = points[triangle.v1-1];
+    glm::vec3 p2_monde = points[triangle.v2-1];
+    glm::vec3 p3_monde = points[triangle.v3-1];
 
-    glm::ivec3 boundingBoxMin = glm::min(glm::min(p1, p2), p3);
-    glm::ivec3 boundingBoxMax = glm::max(glm::max(p1, p2), p3);
+    // illumination
+    glm::vec3 normal = glm::normalize(glm::cross(glm::vec3(p2_monde - p1_monde), glm::vec3(p3_monde - p1_monde)));
+    float intensity = glm::dot(normal, light);
+    if (intensity < 0) {
+        return;
+    }
+
+    // convert to screen space
+    glm::ivec2 p1 = p1_monde * glm::vec3(WIDTH/2, HEIGHT/2, 1) + glm::vec3(WIDTH/2, HEIGHT/2, 0);
+    glm::ivec2 p2 = p2_monde * glm::vec3(WIDTH/2, HEIGHT/2, 1) + glm::vec3(WIDTH/2, HEIGHT/2, 0);
+    glm::ivec2 p3 = p3_monde * glm::vec3(WIDTH/2, HEIGHT/2, 1) + glm::vec3(WIDTH/2, HEIGHT/2, 0);
+
+    glm::ivec2 boundingBoxMin = glm::min(glm::min(p1, p2), p3);
+    glm::ivec2 boundingBoxMax = glm::max(glm::max(p1, p2), p3);
 
     glm::mat3x3 matInv = glm::inverse(glm::mat3x3(p1.x, p1.y, 1,
                                     p2.x, p2.y, 1,
@@ -54,7 +70,10 @@ void drawTriangle(Triangle &triangle, std::vector<glm::vec3> &points, TGAImage &
             glm::vec3 barycentric = matInv * p;
 
             if (glm::all(glm::greaterThanEqual(barycentric, glm::vec3(0)))) {
-                image.set(x, y, TGAColor({ static_cast<uint8_t>(barycentric.x * 255), static_cast<uint8_t>(barycentric.y * 255), static_cast<uint8_t>(barycentric.z * 255) }));
+                image.set(x, y, TGAColor({
+                    static_cast<uint8_t>(barycentric.x * intensity * 255),
+                    static_cast<uint8_t>(barycentric.y * intensity * 255),
+                    static_cast<uint8_t>(barycentric.z * intensity * 255) }));
             }
         }
     }
@@ -76,9 +95,10 @@ int main(int argc, char **argv) {
     Object object(file);
 
     // Draw image
-    TGAImage image(800, 800, TGAImage::Format::RGB);
+    glm::vec3 light(0, 0, 1);
+    TGAImage image(WIDTH, HEIGHT, TGAImage::Format::RGB);
     for (Triangle &triangle : object.triangles) {
-        drawTriangle(triangle, object.points, image);
+        drawTriangle(triangle, object.points, image, light);
     }
-    image.write_tga_file("output.tga");
+    return !image.write_tga_file("output.tga");
 }
