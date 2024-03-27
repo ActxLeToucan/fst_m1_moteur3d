@@ -69,7 +69,7 @@ void drawTriangle(Triangle &triangle, Object &object, TGAImage &image, glm::vec3
             glm::vec3 p(x, y, 1);
             glm::vec3 barycentric = matInv * p;
 
-            if (glm::any(glm::lessThan(barycentric, glm::vec3(0)))) {
+            if (glm::any(glm::lessThan(barycentric, glm::vec3(-0.01)))) {
                 continue;
             }
 
