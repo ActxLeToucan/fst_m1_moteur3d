@@ -39,7 +39,7 @@ void drawLine(int x0, int y0, int x1, int y1, TGAImage &image, TGAColor color) {
     }
 }
 
-void drawTriangle(Triangle &triangle, std::vector<glm::vec3> &points, TGAImage &image, glm::vec3 &light) {
+void drawTriangle(Triangle &triangle, std::vector<glm::vec3> &points, TGAImage &image, glm::vec3 &light, std::vector<float> &zBuffer) {
     glm::vec3 p1_monde = points[triangle.v1-1];
     glm::vec3 p2_monde = points[triangle.v2-1];
     glm::vec3 p3_monde = points[triangle.v3-1];
@@ -66,14 +66,21 @@ void drawTriangle(Triangle &triangle, std::vector<glm::vec3> &points, TGAImage &
     // fill triangle
     for (int x = boundingBoxMin.x; x <= boundingBoxMax.x; x++) {
         for (int y = boundingBoxMin.y; y <= boundingBoxMax.y; y++) {
-            glm::ivec3 p(x, y, 1);
+            glm::vec3 p(x, y, 1);
             glm::vec3 barycentric = matInv * p;
 
-            if (glm::all(glm::greaterThanEqual(barycentric, glm::vec3(0)))) {
-                image.set(x, y, TGAColor({
-                    static_cast<uint8_t>(barycentric.x * intensity * 255),
-                    static_cast<uint8_t>(barycentric.y * intensity * 255),
-                    static_cast<uint8_t>(barycentric.z * intensity * 255) }));
+            if (glm::any(glm::lessThan(barycentric, glm::vec3(0)))) {
+                continue;
+            }
+
+                // z-buffer
+            p.z = glm::dot(glm::vec3(p1_monde.z, p2_monde.z, p3_monde.z), barycentric);
+                if (zBuffer[x + y * WIDTH] < p.z) {
+                zBuffer[x + y * WIDTH] = p.z;
+                        static_cast<uint8_t>(barycentric.x * intensity * 255),
+                        static_cast<uint8_t>(barycentric.y * intensity * 255),
+                        static_cast<uint8_t>(barycentric.z * intensity * 255) }));
+                }
             }
         }
     }
@@ -94,11 +101,14 @@ int main(int argc, char **argv) {
     // Read object
     Object object(file);
 
+    // z-buffer
+    std::vector<float> zBuffer(WIDTH * HEIGHT, std::numeric_limits<float>::lowest());
+
     // Draw image
     glm::vec3 light(0, 0, 1);
     TGAImage image(WIDTH, HEIGHT, TGAImage::Format::RGB);
     for (Triangle &triangle : object.triangles) {
-        drawTriangle(triangle, object.points, image, light);
+        drawTriangle(triangle, object.points, image, light, zBuffer);
     }
     return !image.write_tga_file("output.tga");
 }
