@@ -39,10 +39,10 @@ void drawLine(int x0, int y0, int x1, int y1, TGAImage &image, TGAColor color) {
     }
 }
 
-void drawTriangle(Triangle &triangle, std::vector<glm::vec3> &points, TGAImage &image, glm::vec3 &light, std::vector<float> &zBuffer) {
-    glm::vec3 p1_monde = points[triangle.v1-1];
-    glm::vec3 p2_monde = points[triangle.v2-1];
-    glm::vec3 p3_monde = points[triangle.v3-1];
+void drawTriangle(Triangle &triangle, Object &object, TGAImage &image, glm::vec3 &light, std::vector<float> &zBuffer) {
+    glm::vec3 p1_monde = object.points[triangle.v1-1];
+    glm::vec3 p2_monde = object.points[triangle.v2-1];
+    glm::vec3 p3_monde = object.points[triangle.v3-1];
 
     // illumination
     glm::vec3 normal = glm::normalize(glm::cross(glm::vec3(p2_monde - p1_monde), glm::vec3(p3_monde - p1_monde)));
@@ -73,33 +73,49 @@ void drawTriangle(Triangle &triangle, std::vector<glm::vec3> &points, TGAImage &
                 continue;
             }
 
-                // z-buffer
+            // z-buffer
             p.z = glm::dot(glm::vec3(p1_monde.z, p2_monde.z, p3_monde.z), barycentric);
-                if (zBuffer[x + y * WIDTH] < p.z) {
+            if (zBuffer[x + y * WIDTH] < p.z) {
                 zBuffer[x + y * WIDTH] = p.z;
-                        static_cast<uint8_t>(barycentric.x * intensity * 255),
-                        static_cast<uint8_t>(barycentric.y * intensity * 255),
-                        static_cast<uint8_t>(barycentric.z * intensity * 255) }));
-                }
+
+                // get texture color
+                glm::vec2 uv = object.textureCoords[triangle.vt1-1] * barycentric.x +
+                               object.textureCoords[triangle.vt2-1] * barycentric.y +
+                               object.textureCoords[triangle.vt3-1] * barycentric.z;
+                const TGAColor textureColor = object.texture.get(
+                    uv.x * object.texture.width(),
+                    uv.y * object.texture.height());
+
+                // set color
+                TGAColor color = TGAColor({static_cast<uint8_t>(textureColor.bgra[0] * intensity),
+                    static_cast<uint8_t>(textureColor.bgra[1] * intensity),
+                    static_cast<uint8_t>(textureColor.bgra[2] * intensity)});
+                image.set(x, y, color);
             }
         }
     }
 }
 
 int main(int argc, char **argv) {
-    if (argc < 2) {
-        std::cerr << "Usage: " << argv[0] << " <filename>" << std::endl;
+    if (argc < 3) {
+        std::cerr << "Usage: " << argv[0] << " <filename> <texture>" << std::endl;
         return 1;
     }
 
+    // Read texture
+    TGAImage texture;
+    if (!texture.read_tga_file(argv[2])) {
+        std::cerr << "Could not open file " << argv[2] << std::endl;
+        return 1;
+    }
+
+    // Read object
     std::ifstream file(argv[1]);
     if (!file.is_open()) {
         std::cerr << "Could not open file " << argv[1] << std::endl;
         return 1;
     }
-
-    // Read object
-    Object object(file);
+    Object object(file, texture);
 
     // z-buffer
     std::vector<float> zBuffer(WIDTH * HEIGHT, std::numeric_limits<float>::lowest());
@@ -108,7 +124,7 @@ int main(int argc, char **argv) {
     glm::vec3 light(0, 0, 1);
     TGAImage image(WIDTH, HEIGHT, TGAImage::Format::RGB);
     for (Triangle &triangle : object.triangles) {
-        drawTriangle(triangle, object.points, image, light, zBuffer);
+        drawTriangle(triangle, object, image, light, zBuffer);
     }
     return !image.write_tga_file("output.tga");
 }
