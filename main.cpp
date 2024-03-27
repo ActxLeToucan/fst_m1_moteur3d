@@ -39,7 +39,7 @@ void drawLine(int x0, int y0, int x1, int y1, TGAImage &image, TGAColor color) {
     }
 }
 
-void drawTriangle(Triangle &triangle, Object &object, TGAImage &image, glm::vec3 &light, std::vector<float> &zBuffer) {
+void drawTriangle(Triangle &triangle, Object &object, TGAImage &image, glm::vec3 &light, float* zBuffer) {
     glm::vec3 p1_monde = object.points[triangle.v1-1];
     glm::vec3 p2_monde = object.points[triangle.v2-1];
     glm::vec3 p3_monde = object.points[triangle.v3-1];
@@ -118,7 +118,10 @@ int main(int argc, char **argv) {
     Object object(file, texture);
 
     // z-buffer
-    std::vector<float> zBuffer(WIDTH * HEIGHT, std::numeric_limits<float>::lowest());
+    float* zBuffer = new float[WIDTH * HEIGHT];
+    for (int i = 0; i < WIDTH * HEIGHT; i++) {
+        zBuffer[i] = std::numeric_limits<float>::lowest();
+    }
 
     // Draw image
     glm::vec3 light(0, 0, 1);
