@@ -6,8 +6,8 @@
 #include "Object.h"
 #include "glm/mat3x3.hpp"
 
-#define HEIGHT 800
-#define WIDTH 800
+#define HEIGHT 4096
+#define WIDTH 4096
 
 void drawLine(int x0, int y0, int x1, int y1, TGAImage &image, TGAColor color) {
     bool steep = false;
@@ -64,8 +64,8 @@ void drawTriangle(Triangle &triangle, Object &object, TGAImage &image, glm::vec3
                                     p3.x, p3.y, 1));
 
     // fill triangle
-    for (int x = boundingBoxMin.x; x <= boundingBoxMax.x; x++) {
-        for (int y = boundingBoxMin.y; y <= boundingBoxMax.y; y++) {
+    for (int x = boundingBoxMin.x; x < boundingBoxMax.x; x++) {
+        for (int y = boundingBoxMin.y; y < boundingBoxMax.y; y++) {
             glm::vec3 p(x, y, 1);
             glm::vec3 barycentric = matInv * p;
 
@@ -118,7 +118,7 @@ int main(int argc, char **argv) {
     Object object(file, texture);
 
     // z-buffer
-    float* zBuffer = new float[WIDTH * HEIGHT];
+    auto zBuffer = new float[WIDTH * HEIGHT];
     for (int i = 0; i < WIDTH * HEIGHT; i++) {
         zBuffer[i] = std::numeric_limits<float>::lowest();
     }
@@ -129,5 +129,8 @@ int main(int argc, char **argv) {
     for (Triangle &triangle : object.triangles) {
         drawTriangle(triangle, object, image, light, zBuffer);
     }
+
+    delete[] zBuffer;
+
     return !image.write_tga_file("output.tga");
 }
