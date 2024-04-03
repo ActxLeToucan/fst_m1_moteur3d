@@ -39,7 +39,7 @@ void drawLine(int x0, int y0, int x1, int y1, TGAImage &image, TGAColor color) {
     }
 }
 
-void drawTriangle(Triangle &triangle, Object &object, TGAImage &image, glm::vec3 &light, float* zBuffer) {
+void drawTriangle(Triangle &triangle, Object &object, TGAImage &image, glm::vec3 &light, float* zBuffer, float distanceToCamera) {
     glm::vec3 p1_monde = object.points[triangle.v1-1];
     glm::vec3 p2_monde = object.points[triangle.v2-1];
     glm::vec3 p3_monde = object.points[triangle.v3-1];
@@ -50,6 +50,21 @@ void drawTriangle(Triangle &triangle, Object &object, TGAImage &image, glm::vec3
     if (intensity < 0) {
         return;
     }
+
+    // convert to camera space
+    glm::mat4x4 cameraMat = glm::mat4x4 {
+        1, 0, 0, 0,
+        0, 1, 0, 0,
+        0, 0, 1, -1.f/distanceToCamera,
+        0, 0, 0, 1
+    };
+    glm::vec4 p1_camera = cameraMat * glm::vec4(p1_monde, 1);
+    glm::vec4 p2_camera = cameraMat * glm::vec4(p2_monde, 1);
+    glm::vec4 p3_camera = cameraMat * glm::vec4(p3_monde, 1);
+
+    p1_monde = glm::vec3(p1_camera) / p1_camera.w;
+    p2_monde = glm::vec3(p2_camera) / p2_camera.w;
+    p3_monde = glm::vec3(p3_camera) / p3_camera.w;
 
     // convert to screen space
     glm::ivec2 p1 = p1_monde * glm::vec3(WIDTH/2, HEIGHT/2, 1) + glm::vec3(WIDTH/2, HEIGHT/2, 0);
@@ -68,6 +83,11 @@ void drawTriangle(Triangle &triangle, Object &object, TGAImage &image, glm::vec3
         for (int y = boundingBoxMin.y; y < boundingBoxMax.y; y++) {
             glm::vec3 p(x, y, 1);
             glm::vec3 barycentric = matInv * p;
+
+            // a point can be outside the screen, in that case we skip it
+            if (p.x + p.y * WIDTH < 0 || p.x + p.y * WIDTH >= WIDTH * HEIGHT) {
+              continue;
+            }
 
             if (glm::any(glm::lessThan(barycentric, glm::vec3(-0.01)))) {
                 continue;
@@ -127,7 +147,7 @@ int main(int argc, char **argv) {
     glm::vec3 light(0, 0, 1);
     TGAImage image(WIDTH, HEIGHT, TGAImage::Format::RGB);
     for (Triangle &triangle : object.triangles) {
-        drawTriangle(triangle, object, image, light, zBuffer);
+        drawTriangle(triangle, object, image, light, zBuffer, 5);
     }
 
     delete[] zBuffer;
