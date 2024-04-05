@@ -44,12 +44,9 @@ void drawTriangle(Triangle &triangle, Object &object, TGAImage &image, glm::vec3
     glm::vec3 p2_monde = object.points[triangle.v2-1];
     glm::vec3 p3_monde = object.points[triangle.v3-1];
 
-    // illumination
-    glm::vec3 normal = glm::normalize(glm::cross(glm::vec3(p2_monde - p1_monde), glm::vec3(p3_monde - p1_monde)));
-    float intensity = glm::dot(normal, light);
-    if (intensity < 0) {
-        return;
-    }
+    glm::vec3 normal1 = object.normals[triangle.vn1-1];
+    glm::vec3 normal2 = object.normals[triangle.vn2-1];
+    glm::vec3 normal3 = object.normals[triangle.vn3-1];
 
     // convert to camera space
     glm::mat4x4 cameraMat = glm::mat4x4 {
@@ -90,6 +87,13 @@ void drawTriangle(Triangle &triangle, Object &object, TGAImage &image, glm::vec3
             }
 
             if (glm::any(glm::lessThan(barycentric, glm::vec3(-0.01)))) {
+                continue;
+            }
+
+            // illumination
+            glm::vec3 normal = normal1 * barycentric.x + normal2 * barycentric.y + normal3 * barycentric.z;
+            float intensity = glm::dot(normal, light);
+            if (intensity < 0) {
                 continue;
             }
 
