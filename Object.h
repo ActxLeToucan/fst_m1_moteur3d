@@ -2,9 +2,10 @@
 
 #include <vector>
 
-#include "tgaimage.h"
 #include "Triangle.h"
 #include "glm/vec3.hpp"
+#include "glm/vec4.hpp"
+#include "tgaimage.h"
 
 class Object {
 public:
@@ -41,4 +42,8 @@ public:
      * @throws std::runtime_error If the file is not in the correct format
      */
     explicit Object(std::ifstream &file, TGAImage &texture);
+
+    std::tuple<const glm::vec4, const glm::vec4, const glm::vec4> getTrianglePoints(Triangle &triangle) const;
+
+    std::tuple<const glm::vec3, const glm::vec3, const glm::vec3> getTriangleNormals(Triangle &triangle) const;
 };

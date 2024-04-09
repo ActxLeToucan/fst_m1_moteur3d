@@ -1,6 +1,6 @@
-#include <iostream>
-#include <fstream>
 #include "Object.h"
+#include <fstream>
+#include <iostream>
 
 Object::Object(std::ifstream &file, TGAImage &texture) : texture(texture) {
     std::string line;
@@ -40,4 +40,20 @@ Object::Object(std::ifstream &file, TGAImage &texture) : texture(texture) {
     }
     std::cout << "Read " << points.size() << " points" << std::endl;
     std::cout << "Read " << triangles.size() << " triangles" << std::endl;
+}
+
+std::tuple<const glm::vec4, const glm::vec4, const glm::vec4> Object::getTrianglePoints(Triangle &triangle) const {
+    return {
+      glm::vec4(points[triangle.v1-1], 1),
+      glm::vec4(points[triangle.v2-1], 1),
+      glm::vec4(points[triangle.v3-1], 1)
+    };
+}
+
+std::tuple<const glm::vec3, const glm::vec3, const glm::vec3> Object::getTriangleNormals(Triangle &triangle) const {
+    return {
+      normals[triangle.vn1-1],
+      normals[triangle.vn2-1],
+      normals[triangle.vn3-1]
+    };
 }

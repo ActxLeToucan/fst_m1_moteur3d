@@ -2,12 +2,15 @@
 #include <fstream>
 #include <vector>
 
-#include "tgaimage.h"
 #include "Object.h"
-#include "glm/mat3x3.hpp"
+#include "glm/ext/matrix_clip_space.hpp"
+#include "glm/ext/matrix_transform.hpp"
+#include "tgaimage.h"
 
 #define HEIGHT 4096
 #define WIDTH 4096
+
+#define USE_LIGHT 1
 
 void drawLine(int x0, int y0, int x1, int y1, TGAImage &image, TGAColor color) {
     bool steep = false;
@@ -39,43 +42,33 @@ void drawLine(int x0, int y0, int x1, int y1, TGAImage &image, TGAColor color) {
     }
 }
 
-void drawTriangle(Triangle &triangle, Object &object, TGAImage &image, glm::vec3 &light, float* zBuffer, float distanceToCamera) {
-    glm::vec3 p1_monde = object.points[triangle.v1-1];
-    glm::vec3 p2_monde = object.points[triangle.v2-1];
-    glm::vec3 p3_monde = object.points[triangle.v3-1];
+void drawTriangle(Triangle &triangle, Object &object, TGAImage &image, glm::vec3 &light, float* zBuffer, glm::mat4 &mvp) {
+    // local homogeneous coordinates
+    auto [p1_local, p2_local, p3_local] = object.getTrianglePoints(triangle);
 
-    glm::vec3 normal1 = object.normals[triangle.vn1-1];
-    glm::vec3 normal2 = object.normals[triangle.vn2-1];
-    glm::vec3 normal3 = object.normals[triangle.vn3-1];
+    // apply model view projection
+    glm::vec4 p1_mvp = mvp * p1_local;
+    glm::vec4 p2_mvp = mvp * p2_local;
+    glm::vec4 p3_mvp = mvp * p3_local;
 
-    // convert to camera space
-    glm::mat4x4 cameraMat = glm::mat4x4 {
-        1, 0, 0, 0,
-        0, 1, 0, 0,
-        0, 0, 1, -1.f/distanceToCamera,
-        0, 0, 0, 1
-    };
-    glm::vec4 p1_camera = cameraMat * glm::vec4(p1_monde, 1);
-    glm::vec4 p2_camera = cameraMat * glm::vec4(p2_monde, 1);
-    glm::vec4 p3_camera = cameraMat * glm::vec4(p3_monde, 1);
-
-    p1_monde = glm::vec3(p1_camera) / p1_camera.w;
-    p2_monde = glm::vec3(p2_camera) / p2_camera.w;
-    p3_monde = glm::vec3(p3_camera) / p3_camera.w;
+    glm::vec3 p1 = glm::vec3(p1_mvp) / p1_mvp.w;
+    glm::vec3 p2 = glm::vec3(p2_mvp) / p2_mvp.w;
+    glm::vec3 p3 = glm::vec3(p3_mvp) / p3_mvp.w;
 
     // convert to screen space
-    glm::ivec2 p1 = p1_monde * glm::vec3(WIDTH/2, HEIGHT/2, 1) + glm::vec3(WIDTH/2, HEIGHT/2, 0);
-    glm::ivec2 p2 = p2_monde * glm::vec3(WIDTH/2, HEIGHT/2, 1) + glm::vec3(WIDTH/2, HEIGHT/2, 0);
-    glm::ivec2 p3 = p3_monde * glm::vec3(WIDTH/2, HEIGHT/2, 1) + glm::vec3(WIDTH/2, HEIGHT/2, 0);
+    glm::ivec2 p1_screen = p1 * glm::vec3(WIDTH/2, HEIGHT/2, 1) + glm::vec3(WIDTH/2, HEIGHT/2, 0);
+    glm::ivec2 p2_screen = p2 * glm::vec3(WIDTH/2, HEIGHT/2, 1) + glm::vec3(WIDTH/2, HEIGHT/2, 0);
+    glm::ivec2 p3_screen = p3 * glm::vec3(WIDTH/2, HEIGHT/2, 1) + glm::vec3(WIDTH/2, HEIGHT/2, 0);
 
-    glm::ivec2 boundingBoxMin = glm::min(glm::min(p1, p2), p3);
-    glm::ivec2 boundingBoxMax = glm::max(glm::max(p1, p2), p3);
-
-    glm::mat3x3 matInv = glm::inverse(glm::mat3x3(p1.x, p1.y, 1,
-                                    p2.x, p2.y, 1,
-                                    p3.x, p3.y, 1));
 
     // fill triangle
+    glm::ivec2 boundingBoxMin = glm::min(glm::min(p1_screen, p2_screen), p3_screen);
+    glm::ivec2 boundingBoxMax = glm::max(glm::max(p1_screen, p2_screen), p3_screen);
+
+    glm::mat3x3 matInv = glm::inverse(glm::mat3x3(p1_screen.x, p1_screen.y, 1,
+                                                  p2_screen.x, p2_screen.y, 1,
+                                                  p3_screen.x, p3_screen.y, 1));
+    auto [normal1, normal2, normal3] = object.getTriangleNormals(triangle);
     for (int x = boundingBoxMin.x; x < boundingBoxMax.x; x++) {
         for (int y = boundingBoxMin.y; y < boundingBoxMax.y; y++) {
             glm::vec3 p(x, y, 1);
@@ -83,7 +76,7 @@ void drawTriangle(Triangle &triangle, Object &object, TGAImage &image, glm::vec3
 
             // a point can be outside the screen, in that case we skip it
             if (p.x + p.y * WIDTH < 0 || p.x + p.y * WIDTH >= WIDTH * HEIGHT) {
-              continue;
+                continue;
             }
 
             if (glm::any(glm::lessThan(barycentric, glm::vec3(-0.01)))) {
@@ -92,13 +85,13 @@ void drawTriangle(Triangle &triangle, Object &object, TGAImage &image, glm::vec3
 
             // illumination
             glm::vec3 normal = normal1 * barycentric.x + normal2 * barycentric.y + normal3 * barycentric.z;
-            float intensity = glm::dot(normal, light);
+            float intensity = USE_LIGHT ? glm::dot(normal, light) : 1;
             if (intensity < 0) {
                 continue;
             }
 
             // z-buffer
-            p.z = glm::dot(glm::vec3(p1_monde.z, p2_monde.z, p3_monde.z), barycentric);
+            p.z = glm::dot(glm::vec3(p1.z, p2.z, p3.z), barycentric);
             if (zBuffer[x + y * WIDTH] < p.z) {
                 zBuffer[x + y * WIDTH] = p.z;
 
@@ -147,11 +140,34 @@ int main(int argc, char **argv) {
         zBuffer[i] = std::numeric_limits<float>::lowest();
     }
 
+    /* Model view projection */
+    // model matrix
+    glm::mat4 scale = glm::scale(glm::mat4(1), glm::vec3(1.5));
+    glm::mat4 translate = glm::translate(scale, glm::vec3(0, 0, -1));
+    glm::mat4 modelMat = glm::rotate(translate, glm::radians(20.f), glm::vec3(0, 1, 0));
+
+    // view matrix
+    glm::mat4x4 viewMat = glm::lookAt(
+        glm::vec3(0, 0, 1), // camera position in world space
+        glm::vec3(0, 0, 0), // point to look at
+        glm::vec3(0, 1, 0));
+
+    // projection matrix
+    const float distanceToCamera = 3;
+    glm::mat4 projectionMat = glm::mat4 {
+        1, 0, 0, 0,
+        0, 1, 0, 0,
+        0, 0, 1, -1.f / distanceToCamera,
+        0, 0, 0, 1
+    };
+
+    glm::mat4 mvp = projectionMat * viewMat * modelMat;
+
     // Draw image
-    glm::vec3 light(0, 0, 1);
+    glm::vec3 light = glm::normalize(glm::vec3(0, 0, 1));
     TGAImage image(WIDTH, HEIGHT, TGAImage::Format::RGB);
     for (Triangle &triangle : object.triangles) {
-        drawTriangle(triangle, object, image, light, zBuffer, 5);
+        drawTriangle(triangle, object, image, light, zBuffer, mvp);
     }
 
     delete[] zBuffer;
