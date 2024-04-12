@@ -29,6 +29,10 @@ public:
      * @brief The texture of the object
      */
     TGAImage texture;
+    /**
+     * @brief The normal map of the object
+     */
+    TGAImage normalMap;
 
     /**
      * @brief Construct a new Object with no points or triangles
@@ -39,9 +43,10 @@ public:
      * @brief Construct a new Object from a file
      * @param file The file to read from
      * @param texture The texture image
+     * @param normalMap The normal map image
      * @throws std::runtime_error If the file is not in the correct format
      */
-    explicit Object(std::ifstream &file, TGAImage &texture);
+    explicit Object(std::ifstream &file, TGAImage &texture, TGAImage &normalMap);
 
     /**
      * @brief Get the points of a triangle

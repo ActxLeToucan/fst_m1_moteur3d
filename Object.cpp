@@ -2,7 +2,7 @@
 #include <fstream>
 #include <iostream>
 
-Object::Object(std::ifstream &file, TGAImage &texture) : texture(texture) {
+Object::Object(std::ifstream &file, TGAImage &texture, TGAImage &normalMap) : texture(texture), normalMap(normalMap) {
     std::string line;
     int lineNum = 0;
     while (getline(file, line)) {

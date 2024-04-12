@@ -83,8 +83,25 @@ void drawTriangle(Triangle &triangle, Object &object, TGAImage &image, glm::vec3
                 continue;
             }
 
-            // illumination
+            // texture coordinates
+            glm::vec2 uv = object.textureCoords[triangle.vt1-1] * barycentric.x +
+                           object.textureCoords[triangle.vt2-1] * barycentric.y +
+                           object.textureCoords[triangle.vt3-1] * barycentric.z;
+
+            // Gouraud shading
             glm::vec3 normal = normal1 * barycentric.x + normal2 * barycentric.y + normal3 * barycentric.z;
+
+            // normal mapping
+            const TGAColor normalMapColor = object.normalMap.get(
+                        uv.x * object.normalMap.width(),
+                        uv.y * object.normalMap.height());
+            glm::vec3 normalMapColorVec(normalMapColor.bgra[0],
+                                        normalMapColor.bgra[1],
+                                        normalMapColor.bgra[2]);
+            normalMapColorVec = normalMapColorVec / 255.f * 2.f - 1.f; // from [0, 255] to [-1, 1]
+            normal = glm::normalize(normal + normalMapColorVec);
+
+            // illumination
             float intensity = USE_LIGHT ? glm::dot(normal, light) : 1;
             if (intensity < 0) {
                 intensity = 0;
@@ -110,9 +127,6 @@ void drawTriangle(Triangle &triangle, Object &object, TGAImage &image, glm::vec3
             }
 
             // get texture color
-            glm::vec2 uv = object.textureCoords[triangle.vt1-1] * barycentric.x +
-                           object.textureCoords[triangle.vt2-1] * barycentric.y +
-                           object.textureCoords[triangle.vt3-1] * barycentric.z;
             const TGAColor textureColor = object.texture.get(
                 uv.x * object.texture.width(),
                 uv.y * object.texture.height());
@@ -127,9 +141,16 @@ void drawTriangle(Triangle &triangle, Object &object, TGAImage &image, glm::vec3
 }
 
 int main(int argc, char **argv) {
-    if (argc < 3) {
-        std::cerr << "Usage: " << argv[0] << " <filename> <texture>" << std::endl;
+    if (argc < 4) {
+        std::cerr << "Usage: " << argv[0] << " <filename> <texture> <normalmap>" << std::endl;
         return 1;
+    }
+
+    // Read object
+    std::ifstream file(argv[1]);
+    if (!file.is_open()) {
+      std::cerr << "Could not open file " << argv[1] << std::endl;
+      return 1;
     }
 
     // Read texture
@@ -139,13 +160,14 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    // Read object
-    std::ifstream file(argv[1]);
-    if (!file.is_open()) {
-        std::cerr << "Could not open file " << argv[1] << std::endl;
+    // Read normal map
+    TGAImage normalMap;
+    if (!normalMap.read_tga_file(argv[3])) {
+        std::cerr << "Could not open file " << argv[3] << std::endl;
         return 1;
     }
-    Object object(file, texture);
+
+    Object object(file, texture, normalMap);
 
     // z-buffer
     auto zBuffer = new float[WIDTH * HEIGHT];
@@ -157,7 +179,7 @@ int main(int argc, char **argv) {
     // model matrix
     glm::mat4 scale = glm::scale(glm::mat4(1), glm::vec3(1.5));
     glm::mat4 translate = glm::translate(scale, glm::vec3(0, 0, -1));
-    glm::mat4 modelMat = glm::rotate(translate, glm::radians(20.f), glm::vec3(0, 1, 0));
+    glm::mat4 modelMat = glm::rotate(translate, glm::radians(-20.f), glm::vec3(0, 1, 0));
 //    modelMat = glm::mat4(1);
 //    modelMat = glm::rotate(modelMat, glm::radians(180.f), glm::vec3(0, 1, 0));
 
