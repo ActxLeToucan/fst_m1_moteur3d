@@ -43,7 +43,17 @@ public:
      */
     explicit Object(std::ifstream &file, TGAImage &texture);
 
+    /**
+     * @brief Get the points of a triangle
+     * @param triangle The triangle
+     * @return A tuple containing the points of the triangle
+     */
     std::tuple<const glm::vec4, const glm::vec4, const glm::vec4> getTrianglePoints(Triangle &triangle) const;
 
+    /**
+     * @brief Get the normals of a triangle
+     * @param triangle The triangle
+     * @return A tuple containing the normals of the triangle
+     */
     std::tuple<const glm::vec3, const glm::vec3, const glm::vec3> getTriangleNormals(Triangle &triangle) const;
 };

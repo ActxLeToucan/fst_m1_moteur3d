@@ -1,6 +1,5 @@
-#include <iostream>
 #include <fstream>
-#include <vector>
+#include <iostream>
 
 #include "Object.h"
 #include "glm/ext/matrix_clip_space.hpp"
@@ -11,6 +10,7 @@
 #define WIDTH 4096
 
 #define USE_LIGHT 1
+#define SHOW_ZBUFFER 0
 
 void drawLine(int x0, int y0, int x1, int y1, TGAImage &image, TGAColor color) {
     bool steep = false;
@@ -87,28 +87,41 @@ void drawTriangle(Triangle &triangle, Object &object, TGAImage &image, glm::vec3
             glm::vec3 normal = normal1 * barycentric.x + normal2 * barycentric.y + normal3 * barycentric.z;
             float intensity = USE_LIGHT ? glm::dot(normal, light) : 1;
             if (intensity < 0) {
-                continue;
+                intensity = 0;
             }
 
             // z-buffer
             p.z = glm::dot(glm::vec3(p1.z, p2.z, p3.z), barycentric);
-            if (zBuffer[x + y * WIDTH] < p.z) {
-                zBuffer[x + y * WIDTH] = p.z;
-
-                // get texture color
-                glm::vec2 uv = object.textureCoords[triangle.vt1-1] * barycentric.x +
-                               object.textureCoords[triangle.vt2-1] * barycentric.y +
-                               object.textureCoords[triangle.vt3-1] * barycentric.z;
-                const TGAColor textureColor = object.texture.get(
-                    uv.x * object.texture.width(),
-                    uv.y * object.texture.height());
-
-                // set color
-                TGAColor color = TGAColor({static_cast<uint8_t>(textureColor.bgra[0] * intensity),
-                    static_cast<uint8_t>(textureColor.bgra[1] * intensity),
-                    static_cast<uint8_t>(textureColor.bgra[2] * intensity)});
-                image.set(x, y, color);
+            if (!(zBuffer[x + y * WIDTH] < p.z)) {
+                /* NE PAS MODIFIER LA CONDITION CI-DESSUS !
+                 * CE N'EST PAS LOGIQUE, MAIS INVERSER LA CONDITION
+                 * (mettre >= au lieu de NON <) NE FAIT PAS LA MEME CHOSE
+                 * SUR CERTAINS PIXELS
+                 */
+                continue;
             }
+            zBuffer[x + y * WIDTH] = p.z;
+
+            if (SHOW_ZBUFFER) {
+                image.set(x, y, TGAColor({static_cast<uint8_t>(p.z * 255),
+                    static_cast<uint8_t>(p.z * 255),
+                    static_cast<uint8_t>(p.z * 255)}));
+                continue;
+            }
+
+            // get texture color
+            glm::vec2 uv = object.textureCoords[triangle.vt1-1] * barycentric.x +
+                           object.textureCoords[triangle.vt2-1] * barycentric.y +
+                           object.textureCoords[triangle.vt3-1] * barycentric.z;
+            const TGAColor textureColor = object.texture.get(
+                uv.x * object.texture.width(),
+                uv.y * object.texture.height());
+
+            // set color
+            TGAColor color = TGAColor({static_cast<uint8_t>(textureColor.bgra[0] * intensity),
+                static_cast<uint8_t>(textureColor.bgra[1] * intensity),
+                static_cast<uint8_t>(textureColor.bgra[2] * intensity)});
+            image.set(x, y, color);
         }
     }
 }
@@ -145,16 +158,19 @@ int main(int argc, char **argv) {
     glm::mat4 scale = glm::scale(glm::mat4(1), glm::vec3(1.5));
     glm::mat4 translate = glm::translate(scale, glm::vec3(0, 0, -1));
     glm::mat4 modelMat = glm::rotate(translate, glm::radians(20.f), glm::vec3(0, 1, 0));
+//    modelMat = glm::mat4(1);
+//    modelMat = glm::rotate(modelMat, glm::radians(180.f), glm::vec3(0, 1, 0));
 
     // view matrix
+    glm::vec3 camera(0, 0, 2);
     glm::mat4x4 viewMat = glm::lookAt(
-        glm::vec3(0, 0, 1), // camera position in world space
+        camera, // camera position in world space
         glm::vec3(0, 0, 0), // point to look at
         glm::vec3(0, 1, 0));
 
     // projection matrix
     const float distanceToCamera = 3;
-    glm::mat4 projectionMat = glm::mat4 {
+    glm::mat4 projectionMat {
         1, 0, 0, 0,
         0, 1, 0, 0,
         0, 0, 1, -1.f / distanceToCamera,
@@ -164,7 +180,7 @@ int main(int argc, char **argv) {
     glm::mat4 mvp = projectionMat * viewMat * modelMat;
 
     // Draw image
-    glm::vec3 light = glm::normalize(glm::vec3(0, 0, 1));
+    glm::vec3 light = glm::normalize(glm::vec3(1));
     TGAImage image(WIDTH, HEIGHT, TGAImage::Format::RGB);
     for (Triangle &triangle : object.triangles) {
         drawTriangle(triangle, object, image, light, zBuffer, mvp);
