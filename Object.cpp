@@ -2,7 +2,7 @@
 #include <fstream>
 #include <iostream>
 
-Object::Object(std::string fileName) {
+Object::Object(Options &options, std::string fileName) {
     // Read object
     std::ifstream file(fileName);
     if (!file.is_open()) {
@@ -38,7 +38,8 @@ Object::Object(std::string fileName) {
         } else if (line[0] == 'f' && line[1] == ' ') {
             // Read faces
             Triangle t{};
-            if (sscanf(line.c_str(), "f %d/%d/%d %d/%d/%d %d/%d/%d", &t.v1, &t.vt1, &t.vn1, &t.v2, &t.vt2, &t.vn2, &t.v3, &t.vt3, &t.vn3) != 9) {
+            if (sscanf(line.c_str(), "f %d/%d/%d %d/%d/%d %d/%d/%d", &t.v1, &t.vt1, &t.vn1, &t.v2, &t.vt2, &t.vn2,
+                       &t.v3, &t.vt3, &t.vn3) != 9) {
                 throw std::runtime_error("Error reading file at line " + std::to_string(lineNum));
             }
             triangles.push_back(t);
@@ -51,30 +52,34 @@ Object::Object(std::string fileName) {
     fileName = fileName.substr(0, fileName.find_last_of('.'));
 
     // Read texture
-    std::string textureFilename = fileName + "_diffuse.tga";
-    if (!texture.read_tga_file(textureFilename)) {
-        throw std::runtime_error("Could not open file " + textureFilename);
+    if (options.diffuse) {
+        std::string textureFilename = fileName + "_diffuse.tga";
+        if (!texture.read_tga_file(textureFilename)) {
+            options.disableDiffuse();
+        }
     }
 
     // Read normal map
-    std::string normalMapFilename = fileName + "_nm_tangent.tga";
-    if (!normalMap.read_tga_file(normalMapFilename)) {
-        throw std::runtime_error("Could not open file " + normalMapFilename);
+    if (options.normalMap) {
+        std::string normalMapFilename = fileName + "_nm_tangent.tga";
+        if (!normalMap.read_tga_file(normalMapFilename)) {
+            options.disableNormalMap();
+        }
     }
 }
 
 std::tuple<const glm::vec4, const glm::vec4, const glm::vec4> Object::getTrianglePoints(Triangle &triangle) const {
     return {
-      glm::vec4(points[triangle.v1-1], 1),
-      glm::vec4(points[triangle.v2-1], 1),
-      glm::vec4(points[triangle.v3-1], 1)
+            glm::vec4(points[triangle.v1 - 1], 1),
+            glm::vec4(points[triangle.v2 - 1], 1),
+            glm::vec4(points[triangle.v3 - 1], 1)
     };
 }
 
 std::tuple<const glm::vec3, const glm::vec3, const glm::vec3> Object::getTriangleNormals(Triangle &triangle) const {
     return {
-      normals[triangle.vn1-1],
-      normals[triangle.vn2-1],
-      normals[triangle.vn3-1]
+            normals[triangle.vn1 - 1],
+            normals[triangle.vn2 - 1],
+            normals[triangle.vn3 - 1]
     };
 }
