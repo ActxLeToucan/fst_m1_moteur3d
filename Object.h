@@ -41,12 +41,10 @@ public:
 
     /**
      * @brief Construct a new Object from a file
-     * @param file The file to read from
-     * @param texture The texture image
-     * @param normalMap The normal map image
+     * @param fileName The name of the file
      * @throws std::runtime_error If the file is not in the correct format
      */
-    explicit Object(std::ifstream &file, TGAImage &texture, TGAImage &normalMap);
+    explicit Object(std::string fileName);
 
     /**
      * @brief Get the points of a triangle

@@ -109,12 +109,7 @@ void drawTriangle(Triangle &triangle, Object &object, TGAImage &image, glm::vec3
 
             // z-buffer
             p.z = glm::dot(glm::vec3(p1.z, p2.z, p3.z), barycentric);
-            if (!(zBuffer[x + y * WIDTH] < p.z)) {
-                /* NE PAS MODIFIER LA CONDITION CI-DESSUS !
-                 * CE N'EST PAS LOGIQUE, MAIS INVERSER LA CONDITION
-                 * (mettre >= au lieu de NON <) NE FAIT PAS LA MEME CHOSE
-                 * SUR CERTAINS PIXELS
-                 */
+            if (zBuffer[x + y * WIDTH] >= p.z) {
                 continue;
             }
             zBuffer[x + y * WIDTH] = p.z;
@@ -141,33 +136,12 @@ void drawTriangle(Triangle &triangle, Object &object, TGAImage &image, glm::vec3
 }
 
 int main(int argc, char **argv) {
-    if (argc < 4) {
-        std::cerr << "Usage: " << argv[0] << " <filename> <texture> <normalmap>" << std::endl;
+    if (argc < 2) {
+        std::cerr << "Usage: " << argv[0] << " <filename>" << std::endl;
         return 1;
     }
 
-    // Read object
-    std::ifstream file(argv[1]);
-    if (!file.is_open()) {
-      std::cerr << "Could not open file " << argv[1] << std::endl;
-      return 1;
-    }
-
-    // Read texture
-    TGAImage texture;
-    if (!texture.read_tga_file(argv[2])) {
-        std::cerr << "Could not open file " << argv[2] << std::endl;
-        return 1;
-    }
-
-    // Read normal map
-    TGAImage normalMap;
-    if (!normalMap.read_tga_file(argv[3])) {
-        std::cerr << "Could not open file " << argv[3] << std::endl;
-        return 1;
-    }
-
-    Object object(file, texture, normalMap);
+    Object object(argv[1]);
 
     // z-buffer
     auto zBuffer = new float[WIDTH * HEIGHT];
@@ -179,15 +153,16 @@ int main(int argc, char **argv) {
     // model matrix
     glm::mat4 scale = glm::scale(glm::mat4(1), glm::vec3(1.5));
     glm::mat4 translate = glm::translate(scale, glm::vec3(0, 0, -1));
-    glm::mat4 modelMat = glm::rotate(translate, glm::radians(-20.f), glm::vec3(0, 1, 0));
+    glm::mat4 modelMat = glm::rotate(translate, glm::radians(20.f), glm::vec3(0, 1, 0));
 //    modelMat = glm::mat4(1);
 //    modelMat = glm::rotate(modelMat, glm::radians(180.f), glm::vec3(0, 1, 0));
 
     // view matrix
     glm::vec3 camera(0, 0, 2);
+    glm::vec3 center(0, 0, 0);
     glm::mat4x4 viewMat = glm::lookAt(
         camera, // camera position in world space
-        glm::vec3(0, 0, 0), // point to look at
+        center, // point to look at
         glm::vec3(0, 1, 0));
 
     // projection matrix
@@ -202,7 +177,7 @@ int main(int argc, char **argv) {
     glm::mat4 mvp = projectionMat * viewMat * modelMat;
 
     // Draw image
-    glm::vec3 light = glm::normalize(glm::vec3(1));
+    glm::vec3 light = glm::normalize(glm::vec3(0, 0, 1));
     TGAImage image(WIDTH, HEIGHT, TGAImage::Format::RGB);
     for (Triangle &triangle : object.triangles) {
         drawTriangle(triangle, object, image, light, zBuffer, mvp);

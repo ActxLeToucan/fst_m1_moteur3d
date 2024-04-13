@@ -2,7 +2,13 @@
 #include <fstream>
 #include <iostream>
 
-Object::Object(std::ifstream &file, TGAImage &texture, TGAImage &normalMap) : texture(texture), normalMap(normalMap) {
+Object::Object(std::string fileName) {
+    // Read object
+    std::ifstream file(fileName);
+    if (!file.is_open()) {
+        throw std::runtime_error("Could not open file " + fileName);
+    }
+
     std::string line;
     int lineNum = 0;
     while (getline(file, line)) {
@@ -40,6 +46,21 @@ Object::Object(std::ifstream &file, TGAImage &texture, TGAImage &normalMap) : te
     }
     std::cout << "Read " << points.size() << " points" << std::endl;
     std::cout << "Read " << triangles.size() << " triangles" << std::endl;
+
+
+    fileName = fileName.substr(0, fileName.find_last_of('.'));
+
+    // Read texture
+    std::string textureFilename = fileName + "_diffuse.tga";
+    if (!texture.read_tga_file(textureFilename)) {
+        throw std::runtime_error("Could not open file " + textureFilename);
+    }
+
+    // Read normal map
+    std::string normalMapFilename = fileName + "_nm_tangent.tga";
+    if (!normalMap.read_tga_file(normalMapFilename)) {
+        throw std::runtime_error("Could not open file " + normalMapFilename);
+    }
 }
 
 std::tuple<const glm::vec4, const glm::vec4, const glm::vec4> Object::getTrianglePoints(Triangle &triangle) const {
