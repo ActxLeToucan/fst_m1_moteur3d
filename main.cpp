@@ -61,7 +61,7 @@ void drawLine(int x0, int y0, int x1, int y1, TGAImage &image, TGAColor color) {
 }
 
 void drawTriangle(const Options &options, Triangle &triangle, const Object &object, TGAImage &image,
-                  const glm::vec3 &light, float *zBuffer, const glm::mat4 &mvp) {
+                  const glm::vec3 &light, float *zBuffer, const glm::mat4 &mvp, const glm::mat4 &modelMat) {
     // local homogeneous coordinates
     auto [p1_local, p2_local, p3_local] = object.getTrianglePoints(triangle);
 
@@ -95,7 +95,7 @@ void drawTriangle(const Options &options, Triangle &triangle, const Object &obje
     glm::mat3x3 matInv = glm::inverse(glm::mat3x3(p1_screen.x, p1_screen.y, 1,
                                                   p2_screen.x, p2_screen.y, 1,
                                                   p3_screen.x, p3_screen.y, 1));
-    auto [normal1, normal2, normal3] = object.getTriangleNormals(triangle);
+    auto [normal1, normal2, normal3] = object.getTriangleNormals(triangle, modelMat);
     for (int x = boundingBoxMin.x; x < boundingBoxMax.x; x++) {
         for (int y = boundingBoxMin.y; y < boundingBoxMax.y; y++) {
             glm::vec3 p(x, y, 1);
@@ -124,9 +124,9 @@ void drawTriangle(const Options &options, Triangle &triangle, const Object &obje
             if (options.normalMap) {
                 const TGAColor normalMapColor = object.normalMap.get(uv.x * object.normalMap.width(),
                                                                      uv.y * object.normalMap.height());
-                glm::vec3 normalMapColorVec(normalMapColor.bgra[0],
+                glm::vec3 normalMapColorVec(normalMapColor.bgra[2],
                                             normalMapColor.bgra[1],
-                                            normalMapColor.bgra[2]);
+                                            normalMapColor.bgra[0]);
                 normalMapColorVec = normalMapColorVec / 255.f * 2.f - 1.f; // from [0, 255] to [-1, 1]
                 normal = glm::normalize(normal + normalMapColorVec);
             }
@@ -211,10 +211,10 @@ int main(int argc, char **argv) {
     if (!options.mvp) mvp = glm::mat4(1);
 
     // Draw image
-    glm::vec3 light = glm::normalize(glm::vec3(0, 0, 1) - center);
+    glm::vec3 light = glm::normalize(glm::vec3(0, 1, 1) - center);
     TGAImage image(WIDTH, HEIGHT, TGAImage::Format::RGB);
     for (Triangle &triangle: object.triangles) {
-        drawTriangle(options, triangle, object, image, light, zBuffer, mvp);
+        drawTriangle(options, triangle, object, image, light, zBuffer, mvp, modelMat);
     }
 
     if (options.zBuffer) {

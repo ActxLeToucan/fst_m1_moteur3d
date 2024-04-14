@@ -76,10 +76,10 @@ std::tuple<const glm::vec4, const glm::vec4, const glm::vec4> Object::getTriangl
     };
 }
 
-std::tuple<const glm::vec3, const glm::vec3, const glm::vec3> Object::getTriangleNormals(Triangle &triangle) const {
+std::tuple<const glm::vec3, const glm::vec3, const glm::vec3> Object::getTriangleNormals(Triangle &triangle, const glm::mat4 &modelMat) const {
     return {
-            normals[triangle.vn1 - 1],
-            normals[triangle.vn2 - 1],
-            normals[triangle.vn3 - 1]
+            glm::normalize(glm::vec3(glm::transpose(glm::inverse(modelMat)) * glm::vec4(normals[triangle.vn1 - 1], 0))),
+            glm::normalize(glm::vec3(glm::transpose(glm::inverse(modelMat)) * glm::vec4(normals[triangle.vn2 - 1], 0))),
+            glm::normalize(glm::vec3(glm::transpose(glm::inverse(modelMat)) * glm::vec4(normals[triangle.vn3 - 1], 0)))
     };
 }

@@ -7,6 +7,7 @@
 #include "glm/vec4.hpp"
 #include "tgaimage.h"
 #include "Options.h"
+#include "glm/matrix.hpp"
 
 class Object {
 public:
@@ -56,9 +57,10 @@ public:
     std::tuple<const glm::vec4, const glm::vec4, const glm::vec4> getTrianglePoints(Triangle &triangle) const;
 
     /**
-     * @brief Get the normals of a triangle
+     * @brief Get the normals of a triangle in world coordinates
      * @param triangle The triangle
+     * @param modelMat The model matrix
      * @return A tuple containing the normals of the triangle
      */
-    std::tuple<const glm::vec3, const glm::vec3, const glm::vec3> getTriangleNormals(Triangle &triangle) const;
+    std::tuple<const glm::vec3, const glm::vec3, const glm::vec3> getTriangleNormals(Triangle &triangle, const glm::mat4 &modelMat) const;
 };
