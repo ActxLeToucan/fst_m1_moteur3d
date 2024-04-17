@@ -12,6 +12,7 @@ public:
     bool gouraud = true;
     bool mvp = true;
     bool normalMap = true;
+    bool shadows = true;
 
     explicit Options(int argc, char **argv) {
         bool unknown = false;
@@ -42,6 +43,9 @@ public:
                     case 'n':
                         normalMap = argv[i][3] != '0';
                         break;
+                    case 's':
+                        shadows = argv[i][3] != '0';
+                        break;
                     default:
                         std::cerr << "Unknown option: " << argv[i] << std::endl;
                         unknown = true;
@@ -66,14 +70,17 @@ public:
             diffuse = false;
             gouraud = false;
             normalMap = false;
+            shadows = false;
         } else if (zBuffer) {
             illumination = false;
             diffuse = false;
             gouraud = false;
             normalMap = false;
+            shadows = false;
         } else if (!illumination) {
             gouraud = false;
             normalMap = false;
+            shadows = false;
         }
         std::cout << "Options:" << std::endl;
         std::cout << "  Wireframe: " << wireframe << std::endl;
@@ -84,6 +91,7 @@ public:
         std::cout << "  Gouraud shading: " << gouraud << std::endl;
         std::cout << "  Model view projection: " << mvp << std::endl;
         std::cout << "  Normal mapping: " << normalMap << std::endl;
+        std::cout << "  Shadows: " << shadows << std::endl;
     }
 
     inline void disableDiffuse() {
@@ -106,6 +114,7 @@ public:
         fprintf(out, "  -g:[0|1] Gouraud shading\t\tdefault: 1\n");
         fprintf(out, "  -m:[0|1] Model view projection\tdefault: 1\n");
         fprintf(out, "  -n:[0|1] Normal mapping\t\tdefault: 1\n");
+        fprintf(out, "  -s:[0|1] Shadows\t\t\tdefault: 1\n");
         fprintf(out, "\n0 = disabled, 1 = enabled\n");
     }
 };

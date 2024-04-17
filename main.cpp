@@ -30,7 +30,7 @@ void drawZBuffer(TGAImage &image, float *zBuffer) {
     }
 }
 
-void drawLine(int x0, int y0, int x1, int y1, TGAImage &image, TGAColor color) {
+void drawLine(int x0, int y0, int x1, int y1, TGAImage *image, TGAColor color) {
     bool steep = false;
     if (std::abs(x0 - x1) < std::abs(y0 - y1)) {
         std::swap(x0, y0);
@@ -48,9 +48,9 @@ void drawLine(int x0, int y0, int x1, int y1, TGAImage &image, TGAColor color) {
     int y = y0;
     for (int x = x0; x <= x1; x++) {
         if (steep) {
-            image.set(y, x, color);
+            image->set(y, x, color);
         } else {
-            image.set(x, y, color);
+            image->set(x, y, color);
         }
         error2 += derror2;
         if (error2 > dx) {
@@ -60,12 +60,18 @@ void drawLine(int x0, int y0, int x1, int y1, TGAImage &image, TGAColor color) {
     }
 }
 
-void drawTriangle(const Options &options, Triangle &triangle, const Object &object, TGAImage &image,
-                  const glm::vec3 &light, float *zBuffer, const glm::mat4 &mvp, const glm::mat4 &modelMat) {
+void drawTriangle(const Options &options, Triangle &triangle, const Object &object, TGAImage *image,
+                  const glm::vec3 &light, float *zBuffer, const glm::mat4 &mvp, const glm::mat4 &modelMat,
+                  const float *shadowMap, const glm::mat4 &lightVP) {
     // local homogeneous coordinates
     auto [p1_local, p2_local, p3_local] = object.getTrianglePoints(triangle);
 
-    // apply model view projection
+    // points in world space
+    glm::vec4 p1_m = modelMat * p1_local;
+    glm::vec4 p2_m = modelMat * p2_local;
+    glm::vec4 p3_m = modelMat * p3_local;
+
+    // apply model view projection (points in clip space)
     glm::vec4 p1_mvp = mvp * p1_local;
     glm::vec4 p2_mvp = mvp * p2_local;
     glm::vec4 p3_mvp = mvp * p3_local;
@@ -80,6 +86,8 @@ void drawTriangle(const Options &options, Triangle &triangle, const Object &obje
     glm::ivec2 p3_screen = p3 * glm::vec3(WIDTH / 2, HEIGHT / 2, 1) + glm::vec3(WIDTH / 2, HEIGHT / 2, 0);
 
     if (options.wireframe) {
+        if (image == nullptr) return;
+
         // draw triangle
         TGAColor color = TGAColor({255, 255, 255});
         drawLine(p1_screen.x, p1_screen.y, p2_screen.x, p2_screen.y, image, color);
@@ -135,6 +143,24 @@ void drawTriangle(const Options &options, Triangle &triangle, const Object &obje
             float intensity = options.illumination ? glm::dot(normal, light) : 1;
             if (intensity < 0) {
                 intensity = 0;
+            } else if (shadowMap != nullptr && options.shadows) {
+                // point in world space
+                glm::vec3 pWorld = p1_m * barycentric.x + p2_m * barycentric.y + p3_m * barycentric.z;
+                // point in light space
+                glm::vec4 pLight_vp = lightVP * glm::vec4(pWorld, 1);
+                glm::vec3 pLight = glm::vec3(pLight_vp) / pLight_vp.w;
+                // point in screen space
+                glm::ivec2 pLight_screen = pLight * glm::vec3(WIDTH / 2, HEIGHT / 2, 1) +
+                                           glm::vec3(WIDTH / 2, HEIGHT / 2, 0);
+
+                // shadow
+                if (pLight_screen.x >= 0 && pLight_screen.x < WIDTH && pLight_screen.y >= 0 &&
+                    pLight_screen.y < HEIGHT) {
+                    float shadow = shadowMap[pLight_screen.x + pLight_screen.y * WIDTH];
+                    if (pLight.z < shadow - 0.01f) {
+                        intensity = 0.2f;
+                    }
+                }
             }
 
             // z-buffer
@@ -144,7 +170,7 @@ void drawTriangle(const Options &options, Triangle &triangle, const Object &obje
             }
             zBuffer[x + y * WIDTH] = p.z;
 
-            if (options.zBuffer) {
+            if (options.zBuffer || image == nullptr) {
                 continue;
             }
 
@@ -158,7 +184,7 @@ void drawTriangle(const Options &options, Triangle &triangle, const Object &obje
             TGAColor color = TGAColor({static_cast<uint8_t>(textureColor.bgra[0] * intensity),
                                        static_cast<uint8_t>(textureColor.bgra[1] * intensity),
                                        static_cast<uint8_t>(textureColor.bgra[2] * intensity)});
-            image.set(x, y, color);
+            image->set(x, y, color);
         }
     }
 }
@@ -173,29 +199,27 @@ int main(int argc, char **argv) {
     Options options(argc, argv);
     options.check();
 
+    // load object and files
     Object object(options, argv[1]);
 
-    // z-buffer
-    auto zBuffer = new float[WIDTH * HEIGHT];
+    // initialize z-buffers
+    auto zBuffer   = new float[WIDTH * HEIGHT];
+    auto shadowMap = new float[WIDTH * HEIGHT];
     for (int i = 0; i < WIDTH * HEIGHT; i++) {
-        zBuffer[i] = std::numeric_limits<float>::lowest();
+        zBuffer[i]   = std::numeric_limits<float>::lowest();
+        shadowMap[i] = std::numeric_limits<float>::lowest();
     }
 
-    /* Model view projection */
+    glm::vec3 camera(0, 0, 2);
+    glm::vec3 pointToLookAt(0, 0, 0);
+    glm::vec3 light = glm::normalize(glm::vec3(1, 0, 1) - pointToLookAt);
+
     // model matrix
     glm::mat4 scale = glm::scale(glm::mat4(1), glm::vec3(1.5));
     glm::mat4 translate = glm::translate(scale, glm::vec3(0, 0, -1));
     glm::mat4 modelMat = glm::rotate(translate, glm::radians(20.f), glm::vec3(0, 1, 0));
 //    modelMat = glm::mat4(1);
 //    modelMat = glm::rotate(modelMat, glm::radians(180.f), glm::vec3(0, 1, 0));
-
-    // view matrix
-    glm::vec3 camera(0, 0, 2);
-    glm::vec3 center(0, 0, 0);
-    glm::mat4x4 viewMat = glm::lookAt(
-            camera, // camera position in world space
-            center, // point to look at
-            glm::vec3(0, 1, 0));
 
     // projection matrix
     const float distanceToCamera = 3;
@@ -207,21 +231,50 @@ int main(int argc, char **argv) {
     };
     if (!options.perspective) projectionMat = glm::mat4(1);
 
+    // Shadows
+    glm::mat4 vpLight;
+    {
+        // enable z-buffer
+        Options optionsShadows = options;
+        optionsShadows.zBuffer = true;
+
+        // view matrix for light
+        glm::mat4 viewMat = glm::lookAt(
+                light, // camera position in world space
+                pointToLookAt, // point to look at
+                glm::vec3(0, 1, 0));
+        // model view projection matrix for light
+        glm::mat4 mvp = projectionMat * viewMat * modelMat;
+        // view projection matrix for light
+        vpLight = projectionMat * viewMat;
+
+        // generate z-buffer in light space
+        for (Triangle &triangle: object.triangles) {
+            drawTriangle(optionsShadows, triangle, object, nullptr, light, shadowMap, mvp, modelMat, nullptr, glm::mat4(1));
+        }
+    }
+
+    // view matrix
+    glm::mat4 viewMat = glm::lookAt(
+            camera, // camera position in world space
+            pointToLookAt, // point to look at
+            glm::vec3(0, 1, 0));
+
+    // model view projection matrix
     glm::mat4 mvp = projectionMat * viewMat * modelMat;
     if (!options.mvp) mvp = glm::mat4(1);
 
     // Draw image
-    glm::vec3 light = glm::normalize(glm::vec3(0, 1, 1) - center);
     TGAImage image(WIDTH, HEIGHT, TGAImage::Format::RGB);
     for (Triangle &triangle: object.triangles) {
-        drawTriangle(options, triangle, object, image, light, zBuffer, mvp, modelMat);
+        drawTriangle(options, triangle, object, &image, light, zBuffer, mvp, modelMat, shadowMap, vpLight);
     }
+    if (options.zBuffer) drawZBuffer(image, zBuffer);
 
-    if (options.zBuffer) {
-        drawZBuffer(image, zBuffer);
-    }
-
+    // Clean up
     delete[] zBuffer;
+    delete[] shadowMap;
 
+    // Save image
     return !image.write_tga_file("output.tga");
 }
