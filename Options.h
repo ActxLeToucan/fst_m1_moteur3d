@@ -13,6 +13,7 @@ public:
     bool mvp = true;
     bool normalMap = true;
     bool shadows = true;
+    bool specular = true;
 
     explicit Options(int argc, char **argv) {
         bool unknown = false;
@@ -46,6 +47,9 @@ public:
                     case 's':
                         shadows = argv[i][3] != '0';
                         break;
+                    case 'S':
+                        specular = argv[i][3] != '0';
+                        break;
                     default:
                         std::cerr << "Unknown option: " << argv[i] << std::endl;
                         unknown = true;
@@ -71,12 +75,14 @@ public:
             gouraud = false;
             normalMap = false;
             shadows = false;
+            specular = false;
         } else if (zBuffer) {
             illumination = false;
             diffuse = false;
             gouraud = false;
             normalMap = false;
             shadows = false;
+            specular = false;
         } else if (!illumination) {
             gouraud = false;
             normalMap = false;
@@ -92,6 +98,7 @@ public:
         std::cout << "  Model view projection: " << mvp << std::endl;
         std::cout << "  Normal mapping: " << normalMap << std::endl;
         std::cout << "  Shadows: " << shadows << std::endl;
+        std::cout << "  Specular: " << specular << std::endl;
     }
 
     inline void disableDiffuse() {
@@ -102,6 +109,11 @@ public:
     inline void disableNormalMap() {
         normalMap = false;
         std::cout << "Disabling normal map" << std::endl;
+    }
+
+    inline void disableSpecular() {
+        specular = false;
+        std::cout << "Disabling specular" << std::endl;
     }
 
     static void usage(FILE *out = stdout) {
@@ -115,6 +127,7 @@ public:
         fprintf(out, "  -m:[0|1] Model view projection\tdefault: 1\n");
         fprintf(out, "  -n:[0|1] Normal mapping\t\tdefault: 1\n");
         fprintf(out, "  -s:[0|1] Shadows\t\t\tdefault: 1\n");
+        fprintf(out, "  -S:[0|1] Specular\t\t\tdefault: 1\n");
         fprintf(out, "\n0 = disabled, 1 = enabled\n");
     }
 };

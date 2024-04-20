@@ -66,6 +66,14 @@ Object::Object(Options &options, std::string fileName) {
             options.disableNormalMap();
         }
     }
+
+    // Read specular map
+    if (options.specular) {
+        std::string specularFilename = fileName + "_spec.tga";
+        if (!specularMap.read_tga_file(specularFilename)) {
+            options.disableSpecular();
+        }
+    }
 }
 
 std::tuple<const glm::vec4, const glm::vec4, const glm::vec4> Object::getTrianglePoints(Triangle &triangle) const {

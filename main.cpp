@@ -1,4 +1,5 @@
 #include <iostream>
+#include <algorithm>
 
 #include "Object.h"
 #include "glm/ext/matrix_clip_space.hpp"
@@ -8,6 +9,7 @@
 
 #define HEIGHT 4096
 #define WIDTH 4096
+#define SPECULAR 0.5f
 
 void drawZBuffer(TGAImage &image, float *zBuffer) {
     float min = std::numeric_limits<float>::max();
@@ -126,7 +128,7 @@ void drawTriangle(const Options &options, Triangle &triangle, const Object &obje
             // Gouraud shading
             glm::vec3 normal = options.gouraud ? normal1 * barycentric.x + normal2 * barycentric.y +
                                                  normal3 * barycentric.z
-                                               : glm::normalize(glm::cross(glm::vec3(p2 - p1), glm::vec3(p3 - p1)));
+                                               : glm::normalize(glm::cross(glm::vec3(p2_m - p1_m), glm::vec3(p3_m - p1_m)));
 
             // normal mapping
             if (options.normalMap) {
@@ -182,8 +184,21 @@ void drawTriangle(const Options &options, Triangle &triangle, const Object &obje
 
             // set color
             TGAColor color = TGAColor({static_cast<uint8_t>(textureColor.bgra[0] * intensity),
-                                       static_cast<uint8_t>(textureColor.bgra[1] * intensity),
-                                       static_cast<uint8_t>(textureColor.bgra[2] * intensity)});
+                                      static_cast<uint8_t>(textureColor.bgra[1] * intensity),
+                                      static_cast<uint8_t>(textureColor.bgra[2] * intensity)});
+
+            // specular effect
+            if (options.specular) {
+                const TGAColor specularColor = object.specularMap.get(uv.x * object.specularMap.width(),
+                                                                  uv.y * object.specularMap.height());
+                glm::vec3 reflected = glm::normalize(2 * intensity * normal - light);
+
+                for (int i = 0; i < 3; i++) {
+                    float specColor = specularColor.bgra[i];
+                    float specular = (specColor > 0) * std::pow(std::max(reflected.z, 0.f), specColor) * SPECULAR;
+                    color.bgra[i] = std::clamp((int) (textureColor.bgra[i] * (intensity * options.illumination + specular)), 0, 255);
+                }
+            }
             image->set(x, y, color);
         }
     }
@@ -217,7 +232,7 @@ int main(int argc, char **argv) {
     // model matrix
     glm::mat4 scale = glm::scale(glm::mat4(1), glm::vec3(1.5));
     glm::mat4 translate = glm::translate(scale, glm::vec3(0, 0, -1));
-    glm::mat4 modelMat = glm::rotate(translate, glm::radians(20.f), glm::vec3(0, 1, 0));
+    glm::mat4 modelMat = glm::rotate(translate, glm::radians(-20.f), glm::vec3(0, 1, 0));
 //    modelMat = glm::mat4(1);
 //    modelMat = glm::rotate(modelMat, glm::radians(180.f), glm::vec3(0, 1, 0));
 
@@ -262,7 +277,7 @@ int main(int argc, char **argv) {
 
     // model view projection matrix
     glm::mat4 mvp = projectionMat * viewMat * modelMat;
-    if (!options.mvp) mvp = glm::mat4(1);
+    if (!options.mvp) mvp = projectionMat;
 
     // Draw image
     TGAImage image(WIDTH, HEIGHT, TGAImage::Format::RGB);

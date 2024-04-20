@@ -35,6 +35,10 @@ public:
      * @brief The normal map of the object
      */
     TGAImage normalMap;
+    /**
+     * @brief The specular map of the object
+     */
+    TGAImage specularMap;
 
     /**
      * @brief Construct a new Object with no points or triangles
