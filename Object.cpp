@@ -2,7 +2,7 @@
 #include <fstream>
 #include <iostream>
 
-Object::Object(Options &options, std::string fileName) {
+Object::Object(const Options &options, std::string fileName) {
     // Read object
     std::ifstream file(fileName);
     if (!file.is_open()) {
@@ -23,8 +23,12 @@ Object::Object(Options &options, std::string fileName) {
         } else if (line[0] == 'v' && line[1] == 't') {
             // Read texture coordinates
             glm::vec3 t;
-            if (sscanf(line.c_str(), "vt %f %f %f", &t.x, &t.y, &t.z) != 3) {
+            int res = sscanf(line.c_str(), "vt %f %f %f", &t.x, &t.y, &t.z);
+            if (res != 2 && res != 3) {
                 throw std::runtime_error("Error reading file at line " + std::to_string(lineNum));
+            }
+            if (res == 2) {
+                t.z = 0;
             }
             t.y = 1 - t.y; // Invert y-axis
             textureCoords.push_back(t);
@@ -54,25 +58,19 @@ Object::Object(Options &options, std::string fileName) {
     // Read texture
     if (options.diffuse) {
         std::string textureFilename = fileName + "_diffuse.tga";
-        if (!texture.read_tga_file(textureFilename)) {
-            options.disableDiffuse();
-        }
+        texture.second = texture.first.read_tga_file(textureFilename);
     }
 
     // Read normal map
     if (options.normalMap) {
         std::string normalMapFilename = fileName + "_nm_tangent.tga";
-        if (!normalMap.read_tga_file(normalMapFilename)) {
-            options.disableNormalMap();
-        }
+        normalMap.second = normalMap.first.read_tga_file(normalMapFilename);
     }
 
     // Read specular map
     if (options.specular) {
         std::string specularFilename = fileName + "_spec.tga";
-        if (!specularMap.read_tga_file(specularFilename)) {
-            options.disableSpecular();
-        }
+        specularMap.second = specularMap.first.read_tga_file(specularFilename);
     }
 }
 
@@ -84,7 +82,7 @@ std::tuple<const glm::vec4, const glm::vec4, const glm::vec4> Object::getTriangl
     };
 }
 
-std::tuple<const glm::vec3, const glm::vec3, const glm::vec3> Object::getTriangleNormals(Triangle &triangle, const glm::mat4 &modelMat) const {
+std::tuple<const glm::vec3, const glm::vec3, const glm::vec3> Object::getTriangleNormals(Triangle &triangle) const {
     return {
             glm::normalize(glm::vec3(glm::transpose(glm::inverse(modelMat)) * glm::vec4(normals[triangle.vn1 - 1], 0))),
             glm::normalize(glm::vec3(glm::transpose(glm::inverse(modelMat)) * glm::vec4(normals[triangle.vn2 - 1], 0))),

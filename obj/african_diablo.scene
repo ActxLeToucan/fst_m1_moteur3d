@@ -1,0 +1,13 @@
+LIGHT   1 0 1
+EYE     0 0 2
+
+FILE=african_head.obj
+.rotate 1 -20
+FILE=african_head_eye_inner.obj
+.rotate 1 -20
+#FILE=african_head_eye_outer.obj
+#.rotate 1 -20
+FILE=floor.obj
+FILE=diablo3_pose.obj
+.translate 1 0 0.5
+.scale 0.7 0.7 0.7

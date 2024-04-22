@@ -6,6 +6,7 @@
 #include "glm/ext/matrix_transform.hpp"
 #include "tgaimage.h"
 #include "Options.h"
+#include "Scene.h"
 
 #define HEIGHT 4096
 #define WIDTH 4096
@@ -63,20 +64,20 @@ void drawLine(int x0, int y0, int x1, int y1, TGAImage *image, TGAColor color) {
 }
 
 void drawTriangle(const Options &options, Triangle &triangle, const Object &object, TGAImage *image,
-                  const glm::vec3 &light, float *zBuffer, const glm::mat4 &mvp, const glm::mat4 &modelMat,
+                  const glm::vec3 &light, float *zBuffer, const glm::mat4 &vp,
                   const float *shadowMap, const glm::mat4 &lightVP) {
     // local homogeneous coordinates
     auto [p1_local, p2_local, p3_local] = object.getTrianglePoints(triangle);
 
     // points in world space
-    glm::vec4 p1_m = modelMat * p1_local;
-    glm::vec4 p2_m = modelMat * p2_local;
-    glm::vec4 p3_m = modelMat * p3_local;
+    glm::vec4 p1_m = object.modelMat * p1_local;
+    glm::vec4 p2_m = object.modelMat * p2_local;
+    glm::vec4 p3_m = object.modelMat * p3_local;
 
     // apply model view projection (points in clip space)
-    glm::vec4 p1_mvp = mvp * p1_local;
-    glm::vec4 p2_mvp = mvp * p2_local;
-    glm::vec4 p3_mvp = mvp * p3_local;
+    glm::vec4 p1_mvp = vp * object.modelMat * p1_local;
+    glm::vec4 p2_mvp = vp * object.modelMat * p2_local;
+    glm::vec4 p3_mvp = vp * object.modelMat * p3_local;
 
     glm::vec3 p1 = glm::vec3(p1_mvp) / p1_mvp.w;
     glm::vec3 p2 = glm::vec3(p2_mvp) / p2_mvp.w;
@@ -105,7 +106,7 @@ void drawTriangle(const Options &options, Triangle &triangle, const Object &obje
     glm::mat3x3 matInv = glm::inverse(glm::mat3x3(p1_screen.x, p1_screen.y, 1,
                                                   p2_screen.x, p2_screen.y, 1,
                                                   p3_screen.x, p3_screen.y, 1));
-    auto [normal1, normal2, normal3] = object.getTriangleNormals(triangle, modelMat);
+    auto [normal1, normal2, normal3] = object.getTriangleNormals(triangle);
     for (int x = boundingBoxMin.x; x < boundingBoxMax.x; x++) {
         for (int y = boundingBoxMin.y; y < boundingBoxMax.y; y++) {
             glm::vec3 p(x, y, 1);
@@ -131,9 +132,9 @@ void drawTriangle(const Options &options, Triangle &triangle, const Object &obje
                                                : glm::normalize(glm::cross(glm::vec3(p2_m - p1_m), glm::vec3(p3_m - p1_m)));
 
             // normal mapping
-            if (options.normalMap) {
-                const TGAColor normalMapColor = object.normalMap.get(uv.x * object.normalMap.width(),
-                                                                     uv.y * object.normalMap.height());
+            if (options.normalMap && object.normalMap.second) {
+                const TGAColor normalMapColor = object.normalMap.first.get(uv.x * object.normalMap.first.width(),
+                                                                           uv.y * object.normalMap.first.height());
                 glm::vec3 normalMapColorVec(normalMapColor.bgra[2],
                                             normalMapColor.bgra[1],
                                             normalMapColor.bgra[0]);
@@ -177,20 +178,20 @@ void drawTriangle(const Options &options, Triangle &triangle, const Object &obje
             }
 
             // get texture color
-            const TGAColor textureColor = options.diffuse ?
-                                          object.texture.get(uv.x * object.texture.width(),
-                                                             uv.y * object.texture.height()) :
+            const TGAColor textureColor = options.diffuse && object.texture.second ?
+                                          object.texture.first.get(uv.x * object.texture.first.width(),
+                                                                   uv.y * object.texture.first.height()) :
                                           TGAColor({255, 255, 255});
 
             // set color
             TGAColor color = TGAColor({static_cast<uint8_t>(textureColor.bgra[0] * intensity),
-                                      static_cast<uint8_t>(textureColor.bgra[1] * intensity),
-                                      static_cast<uint8_t>(textureColor.bgra[2] * intensity)});
+                                       static_cast<uint8_t>(textureColor.bgra[1] * intensity),
+                                       static_cast<uint8_t>(textureColor.bgra[2] * intensity)});
 
             // specular effect
-            if (options.specular) {
-                const TGAColor specularColor = object.specularMap.get(uv.x * object.specularMap.width(),
-                                                                  uv.y * object.specularMap.height());
+            if (options.specular && object.specularMap.second) {
+                const TGAColor specularColor = object.specularMap.first.get(uv.x * object.specularMap.first.width(),
+                                                                            uv.y * object.specularMap.first.height());
                 glm::vec3 reflected = glm::normalize(2 * intensity * normal - light);
 
                 for (int i = 0; i < 3; i++) {
@@ -199,23 +200,30 @@ void drawTriangle(const Options &options, Triangle &triangle, const Object &obje
                     color.bgra[i] = std::clamp((int) (textureColor.bgra[i] * (intensity * options.illumination + specular)), 0, 255);
                 }
             }
+
             image->set(x, y, color);
         }
     }
 }
 
+void usage(FILE *out, char *name) {
+    fprintf(out, "Usage: %s <filename> [options]\n", name);
+    fprintf(out, "  <filename>  The name of the file to load (can be .obj or a scene file)\n");
+    Options::usage(out);
+}
+
 int main(int argc, char **argv) {
     if (argc < 2) {
-        std::cerr << "Usage: " << argv[0] << " <filename> [options]" << std::endl;
-        Options::usage(stderr);
+        usage(stderr, argv[0]);
         return 1;
     }
-
-    Options options(argc, argv);
-    options.check();
+    if ((std::string) argv[1] == "-h" || (std::string) argv[1] == "--help") {
+        usage(stdout, argv[0]);
+        return 0;
+    }
 
     // load object and files
-    Object object(options, argv[1]);
+    Scene scene(Options(argc, argv), argv[1]);
 
     // initialize z-buffers
     auto zBuffer   = new float[WIDTH * HEIGHT];
@@ -225,66 +233,55 @@ int main(int argc, char **argv) {
         shadowMap[i] = std::numeric_limits<float>::lowest();
     }
 
-    glm::vec3 camera(0, 0, 2);
     glm::vec3 pointToLookAt(0, 0, 0);
-    glm::vec3 light = glm::normalize(glm::vec3(1, 0, 1) - pointToLookAt);
-
-    // model matrix
-    glm::mat4 scale = glm::scale(glm::mat4(1), glm::vec3(1.5));
-    glm::mat4 translate = glm::translate(scale, glm::vec3(0, 0, -1));
-    glm::mat4 modelMat = glm::rotate(translate, glm::radians(-20.f), glm::vec3(0, 1, 0));
-//    modelMat = glm::mat4(1);
-//    modelMat = glm::rotate(modelMat, glm::radians(180.f), glm::vec3(0, 1, 0));
 
     // projection matrix
-    const float distanceToCamera = 3;
+    const float distanceToCamera = glm::length(scene.eye - pointToLookAt);
     glm::mat4 projectionMat{
             1, 0, 0, 0,
             0, 1, 0, 0,
             0, 0, 1, -1.f / distanceToCamera,
             0, 0, 0, 1
     };
-    if (!options.perspective) projectionMat = glm::mat4(1);
+    if (!scene.options.perspective) projectionMat = glm::mat4(1);
 
     // Shadows
     glm::mat4 vpLight;
     {
         // enable z-buffer
-        Options optionsShadows = options;
+        Options optionsShadows = scene.options;
         optionsShadows.zBuffer = true;
 
         // view matrix for light
         glm::mat4 viewMat = glm::lookAt(
-                light, // camera position in world space
+                scene.light, // camera position in world space
                 pointToLookAt, // point to look at
                 glm::vec3(0, 1, 0));
-        // model view projection matrix for light
-        glm::mat4 mvp = projectionMat * viewMat * modelMat;
         // view projection matrix for light
         vpLight = projectionMat * viewMat;
 
         // generate z-buffer in light space
-        for (Triangle &triangle: object.triangles) {
-            drawTriangle(optionsShadows, triangle, object, nullptr, light, shadowMap, mvp, modelMat, nullptr, glm::mat4(1));
+        for (Object &object: scene.objects) for (Triangle &triangle: object.triangles) {
+            drawTriangle(optionsShadows, triangle, object, nullptr, scene.light, shadowMap, vpLight, nullptr, glm::mat4(1));
         }
     }
 
     // view matrix
     glm::mat4 viewMat = glm::lookAt(
-            camera, // camera position in world space
+            scene.eye, // camera position in world space
             pointToLookAt, // point to look at
             glm::vec3(0, 1, 0));
 
     // model view projection matrix
-    glm::mat4 mvp = projectionMat * viewMat * modelMat;
-    if (!options.mvp) mvp = projectionMat;
+    glm::mat4 vp = projectionMat * viewMat;
+    if (!scene.options.mvp) vp = projectionMat;
 
     // Draw image
     TGAImage image(WIDTH, HEIGHT, TGAImage::Format::RGB);
-    for (Triangle &triangle: object.triangles) {
-        drawTriangle(options, triangle, object, &image, light, zBuffer, mvp, modelMat, shadowMap, vpLight);
+    for (Object &object: scene.objects) for (Triangle &triangle: object.triangles) {
+        drawTriangle(scene.options, triangle, object, &image, scene.light, zBuffer, vp, shadowMap, vpLight);
     }
-    if (options.zBuffer) drawZBuffer(image, zBuffer);
+    if (scene.options.zBuffer) drawZBuffer(image, zBuffer);
 
     // Clean up
     delete[] zBuffer;
