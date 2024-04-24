@@ -33,6 +33,7 @@ void drawZBuffer(TGAImage &image, float *zBuffer) {
     }
 }
 
+// fonction de M. Sokolov (https://github.com/ssloy/tinyrenderer)
 void drawLine(int x0, int y0, int x1, int y1, TGAImage *image, TGAColor color) {
     bool steep = false;
     if (std::abs(x0 - x1) < std::abs(y0 - y1)) {
@@ -70,23 +71,23 @@ void drawTriangle(const Options &options, Triangle &triangle, const Object &obje
     auto [p1_local, p2_local, p3_local] = object.getTrianglePoints(triangle);
 
     // points in world space
-    glm::vec4 p1_m = object.modelMat * p1_local;
-    glm::vec4 p2_m = object.modelMat * p2_local;
-    glm::vec4 p3_m = object.modelMat * p3_local;
+    const glm::vec4 p1_m = object.modelMat * p1_local;
+    const glm::vec4 p2_m = object.modelMat * p2_local;
+    const glm::vec4 p3_m = object.modelMat * p3_local;
 
     // apply model view projection (points in clip space)
-    glm::vec4 p1_mvp = vp * object.modelMat * p1_local;
-    glm::vec4 p2_mvp = vp * object.modelMat * p2_local;
-    glm::vec4 p3_mvp = vp * object.modelMat * p3_local;
+    const glm::vec4 p1_mvp = vp * object.modelMat * p1_local;
+    const glm::vec4 p2_mvp = vp * object.modelMat * p2_local;
+    const glm::vec4 p3_mvp = vp * object.modelMat * p3_local;
 
-    glm::vec3 p1 = glm::vec3(p1_mvp) / p1_mvp.w;
-    glm::vec3 p2 = glm::vec3(p2_mvp) / p2_mvp.w;
-    glm::vec3 p3 = glm::vec3(p3_mvp) / p3_mvp.w;
+    const glm::vec3 p1 = glm::vec3(p1_mvp) / p1_mvp.w;
+    const glm::vec3 p2 = glm::vec3(p2_mvp) / p2_mvp.w;
+    const glm::vec3 p3 = glm::vec3(p3_mvp) / p3_mvp.w;
 
     // convert to screen space
-    glm::ivec2 p1_screen = p1 * glm::vec3(WIDTH / 2, HEIGHT / 2, 1) + glm::vec3(WIDTH / 2, HEIGHT / 2, 0);
-    glm::ivec2 p2_screen = p2 * glm::vec3(WIDTH / 2, HEIGHT / 2, 1) + glm::vec3(WIDTH / 2, HEIGHT / 2, 0);
-    glm::ivec2 p3_screen = p3 * glm::vec3(WIDTH / 2, HEIGHT / 2, 1) + glm::vec3(WIDTH / 2, HEIGHT / 2, 0);
+    const glm::ivec2 p1_screen = p1 * glm::vec3(WIDTH / 2, HEIGHT / 2, 1) + glm::vec3(WIDTH / 2, HEIGHT / 2, 0);
+    const glm::ivec2 p2_screen = p2 * glm::vec3(WIDTH / 2, HEIGHT / 2, 1) + glm::vec3(WIDTH / 2, HEIGHT / 2, 0);
+    const glm::ivec2 p3_screen = p3 * glm::vec3(WIDTH / 2, HEIGHT / 2, 1) + glm::vec3(WIDTH / 2, HEIGHT / 2, 0);
 
     if (options.wireframe) {
         if (image == nullptr) return;
@@ -100,13 +101,15 @@ void drawTriangle(const Options &options, Triangle &triangle, const Object &obje
     }
 
     // fill triangle
-    glm::ivec2 boundingBoxMin = glm::min(glm::min(p1_screen, p2_screen), p3_screen);
-    glm::ivec2 boundingBoxMax = glm::max(glm::max(p1_screen, p2_screen), p3_screen);
+    const glm::ivec2 boundingBoxMin = glm::min(glm::min(p1_screen, p2_screen), p3_screen);
+    const glm::ivec2 boundingBoxMax = glm::max(glm::max(p1_screen, p2_screen), p3_screen);
 
-    glm::mat3x3 matInv = glm::inverse(glm::mat3x3(p1_screen.x, p1_screen.y, 1,
+    const glm::mat3x3 matInv = glm::inverse(glm::mat3x3(p1_screen.x, p1_screen.y, 1,
                                                   p2_screen.x, p2_screen.y, 1,
                                                   p3_screen.x, p3_screen.y, 1));
-    auto [normal1, normal2, normal3] = object.getTriangleNormals(triangle);
+    const std::tuple<const glm::vec3, const glm::vec3, const glm::vec3> normals = object.getTriangleNormals(triangle);
+
+    #pragma omp parallel for // cf. cours d'Algorithmique Parallèle de M. Contassot-Vivier
     for (int x = boundingBoxMin.x; x < boundingBoxMax.x; x++) {
         for (int y = boundingBoxMin.y; y < boundingBoxMax.y; y++) {
             glm::vec3 p(x, y, 1);
@@ -127,8 +130,9 @@ void drawTriangle(const Options &options, Triangle &triangle, const Object &obje
                            object.textureCoords[triangle.vt3 - 1] * barycentric.z;
 
             // Gouraud shading
-            glm::vec3 normal = options.gouraud ? normal1 * barycentric.x + normal2 * barycentric.y +
-                                                 normal3 * barycentric.z
+            glm::vec3 normal = options.gouraud ? std::get<0>(normals) * barycentric.x +
+                                                 std::get<1>(normals) * barycentric.y +
+                                                 std::get<2>(normals) * barycentric.z
                                                : glm::normalize(glm::cross(glm::vec3(p2_m - p1_m), glm::vec3(p3_m - p1_m)));
 
             // normal mapping
