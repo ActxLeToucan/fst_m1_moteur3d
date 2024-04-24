@@ -7,8 +7,10 @@ cmake ..
 make
 ```
 
-* [**glm**](https://github.com/g-truc/glm.git) est nécessaire. S'il n'est pas présent sur votre machine, cmake le téléchargera automatiquement.
+* [**glm**](https://github.com/g-truc/glm.git) est nécessaire.
+S'il n'est pas présent sur votre machine, cmake le téléchargera automatiquement.
 * Si **OpenMP** est installé sur votre machine, vous profiterez du multi-threading.
+(Mise en pratique du cours d'*Algorithmique Parallèle* de M1, de M. Contassot-Vivier)
 
 ## Exécution
 Donner en paramètre un fichier de scène (comme [african_head.scene](./obj/african_diablo.scene)) ou directement un fichier .obj (comme [african_head.obj](./obj/african_head.obj)).

@@ -109,7 +109,7 @@ void drawTriangle(const Options &options, Triangle &triangle, const Object &obje
                                                   p3_screen.x, p3_screen.y, 1));
     const std::tuple<const glm::vec3, const glm::vec3, const glm::vec3> normals = object.getTriangleNormals(triangle);
 
-    #pragma omp parallel for // cf. cours d'Algorithmique Parallèle de M. Contassot-Vivier
+    #pragma omp parallel for schedule(dynamic) // cf. cours d'Algorithmique Parallèle de M. Contassot-Vivier
     for (int x = boundingBoxMin.x; x < boundingBoxMax.x; x++) {
         for (int y = boundingBoxMin.y; y < boundingBoxMax.y; y++) {
             glm::vec3 p(x, y, 1);
