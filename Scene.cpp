@@ -11,7 +11,7 @@ Scene::Scene(Options options, const std::string &fileName) : options(options) {
     }
 
     if (fileName.find(".obj") != std::string::npos) {
-        objects.push_back(Object(options, fileName));
+        objects.emplace_back(options, fileName);
         return;
     }
 
@@ -22,9 +22,7 @@ Scene::Scene(Options options, const std::string &fileName) : options(options) {
     while (getline(file, line)) {
         lineNum++;
         if (line.find("FILE=") == 0) {
-            std::string objectFileName = folder + line.substr(5);
-            std::cout << "Read object " << objectFileName << std::endl;
-            objects.push_back(Object(options, objectFileName));
+            createObject(line, folder);
         } else if (line.find(".translate ") == 0) {
             glm::vec3 vec;
             if (sscanf(line.c_str(), ".translate %f %f %f", &vec.x, &vec.y, &vec.z) != 3) {
@@ -64,4 +62,11 @@ Scene::Scene(Options options, const std::string &fileName) : options(options) {
     if (objects.empty()) {
         throw std::runtime_error("No objects found in file " + fileName);
     }
+}
+
+void Scene::createObject(const std::string &line, const std::string &folder) {
+    std::string objectFileName = line.substr(5);
+    trim(objectFileName);
+    objectFileName = folder + objectFileName;
+    objects.emplace_back(options, objectFileName);
 }
